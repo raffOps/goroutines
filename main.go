@@ -6,24 +6,32 @@ import (
 	"time"
 )
 
-func printNumbers(channel chan int, wg *sync.WaitGroup) {
-	defer close(channel)
+func printNumbers(numberChan chan<- int, letterChan <-chan rune, wg *sync.WaitGroup) {
+	defer close(numberChan)
 	defer wg.Done()
 
-	for i := 0; i < 12; i++ {
+	for i := 0; i < 20; i++ {
+		var letter rune
+		var ok bool
+		for i == 8 && letter <= 'g' { // after 8, the next number will be printed only after the letter g
+			letter, ok = <-letterChan
+			if !ok {
+				break
+			}
+		}
 		fmt.Printf("%d ", i)
 		time.Sleep(time.Millisecond * 150)
-		channel <- i
+		numberChan <- i
 	}
 }
 
-func printLetters(channel chan rune, numberChan chan int, wg *sync.WaitGroup) {
+func printLetters(letterChan chan<- rune, numberChan <-chan int, wg *sync.WaitGroup) {
+	defer close(letterChan)
 	defer wg.Done()
-	for l := 'a'; l < 'n'; l++ {
-		// the letters will be printed only after the 6
+	for l := 'a'; l <= 'm'; l++ {
 		var number int
 		var ok bool
-		for l == 'a' && number < 6 {
+		for l == 'a' && number <= 6 { // the letters will be printed only after the 6
 			number, ok = <-numberChan
 			if !ok {
 				break
@@ -31,7 +39,7 @@ func printLetters(channel chan rune, numberChan chan int, wg *sync.WaitGroup) {
 		}
 		fmt.Printf("%c ", l)
 		time.Sleep(time.Millisecond * 230)
-		channel <- l
+		letterChan <- l
 	}
 }
 
@@ -42,7 +50,7 @@ func main() {
 
 	numberChan := make(chan int, 100)
 	letterChan := make(chan rune, 100)
-	go printNumbers(numberChan, &wg)
+	go printNumbers(numberChan, letterChan, &wg)
 	go printLetters(letterChan, numberChan, &wg)
 
 	wg.Wait()
